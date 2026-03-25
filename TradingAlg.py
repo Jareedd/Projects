@@ -9,7 +9,7 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, confu
 
 
 def load_price_data(path: str) -> pd.DataFrame:
-    # First try a standard single-header CSV: Date, Open, High, Low, Close, ...
+
     standard = pd.read_csv(path)
     if {"Date", "Close"}.issubset(standard.columns):
         df = standard.copy()
@@ -17,7 +17,6 @@ def load_price_data(path: str) -> pd.DataFrame:
         df["Close"] = pd.to_numeric(df["Close"], errors="coerce")
         return df.dropna(subset=["Date", "Close"]).sort_values("Date").reset_index(drop=True)
 
-    # Fallback for yfinance-style multi-header exports in your current file
     multi = pd.read_csv(path, header=[0, 1])
     multi.columns = [col[0] if isinstance(col, tuple) else col for col in multi.columns]
     multi = multi.rename(columns={"Price": "Date"})
@@ -70,7 +69,6 @@ def build_ml_features(price_df: pd.DataFrame) -> pd.DataFrame:
     df = price_df.copy()
     df["Daily_Return"] = df["Close"].pct_change()
 
-    # Only use information available by end of day t to predict day t+1.
     df["ret_1"] = df["Daily_Return"]
     df["ret_5"] = df["Close"].pct_change(5)
     df["ret_10"] = df["Close"].pct_change(10)
@@ -81,7 +79,6 @@ def build_ml_features(price_df: pd.DataFrame) -> pd.DataFrame:
     df["sma_ratio"] = df["sma_10"] / df["sma_30"] - 1.0
     df["mom_10"] = df["Close"] / df["Close"].shift(10) - 1.0
 
-    # Target: next day's direction.
     df["Target"] = (df["Daily_Return"].shift(-1) > 0).astype(int)
     return df
 
@@ -130,7 +127,6 @@ def run_ml_backtest(
     probs = model.predict_proba(df[feature_cols])[:, 1]
     df["Prob_Up"] = probs
 
-    # Long/short with confidence filter.
     df["Signal"] = 0
     df.loc[df["Prob_Up"] >= prob_threshold, "Signal"] = 1
     df.loc[df["Prob_Up"] <= (1 - prob_threshold), "Signal"] = -1
@@ -147,7 +143,7 @@ def run_ml_backtest(
 
 
 def tune_ml_threshold(train_feat_df: pd.DataFrame, feature_cols: list, thresholds: list, model_cfg: dict) -> float:
-    # Keep time order: first part for fitting, last part for validation.
+    #  first part for fitting, last part for validation.
     split_idx = int(len(train_feat_df) * 0.8)
     fit_df = train_feat_df.iloc[:split_idx].copy()
     val_df = train_feat_df.iloc[split_idx:].copy()
@@ -217,7 +213,6 @@ def walk_forward_score_params(
     avg_drawdown = float(np.mean(drawdown_list))
     avg_turnover = float(np.mean(turnover_list))
 
-    # Reward risk-adjusted return while penalizing overtrading and deep drawdowns.
     score = avg_sharpe - (0.40 * abs(avg_drawdown)) - (1.20 * avg_turnover)
     return {
         "windows": window_count,
@@ -482,7 +477,6 @@ def main() -> None:
     holdout_strategy = compute_metrics(holdout_bt, "Strategy_Return", "Strategy_Equity")
     holdout_benchmark = compute_metrics(holdout_bt, "Benchmark_Return", "Benchmark_Equity", trade_col="NoTrade")
 
-    # Holdout classification metrics
     holdout_bt["Pred_Direction"] = (holdout_bt["Prob_Up"] > 0.5).astype(int)
     holdout_bt["True_Direction"] = holdout_bt["Target"].astype(int)
     holdout_accuracy = accuracy_score(holdout_bt["True_Direction"], holdout_bt["Pred_Direction"])
@@ -490,7 +484,6 @@ def main() -> None:
     holdout_recall = recall_score(holdout_bt["True_Direction"], holdout_bt["Pred_Direction"], zero_division=0)
     holdout_cm = confusion_matrix(holdout_bt["True_Direction"], holdout_bt["Pred_Direction"], labels=[0, 1])
 
-    # Export reports
     tuning_table.to_csv("model_tuning_results.csv", index=False)
     metrics_rows = [
         {
