@@ -1,0 +1,80 @@
+
+import numpy as np
+
+np.random.seed(0)
+
+# XOR dataset (inputs and targets)
+X = np.array([[0,0],
+              [0,1],
+              [1,0],
+              [1,1]], dtype=float)
+y = np.array([[0],
+              [1],
+              [1],
+              [0]], dtype=float)
+
+# Network architecture
+n_input = 2
+n_hidden = 2
+n_output = 1
+
+# Initialize weights and biases
+W1 = np.random.randn(n_input, n_hidden) * 0.5  # (2x2)
+b1 = np.zeros((1, n_hidden))                   # (1x2)
+
+W2 = np.random.randn(n_hidden, n_output) * 0.5 # (2x1)
+b2 = np.zeros((1, n_output))                   # (1x1)
+
+# Activation helpers
+def sigmoid(z):
+    return 1 / (1 + np.exp(-z))
+
+def dsigmoid(a):  
+    return a * (1 - a)
+
+def forward(X):
+    z1 = X.dot(W1) + b1        # (4x2)
+    a1 = np.tanh(z1)           # hidden  
+    z2 = a1.dot(W2) + b2        # (4x1)
+    a2 = sigmoid(z2)           # output
+    return z1, a1, z2, a2
+
+#Training 
+epochs = 10000
+lr = 0.1
+
+for epoch in range(epochs):
+    z1, a1, z2, a2 = forward(X)
+
+    
+    eps = 1e-9
+    loss = -np.mean(y * np.log(a2 + eps) + (1 - y) * np.log(1 - a2 + eps))
+
+   
+    delta2 = a2 - y                 # (4x1)
+
+    dW2 = a1.T.dot(delta2)          # (2x4) x (4x1) -> (2x1)
+    db2 = np.sum(delta2, axis=0, keepdims=True)  # (1x1)
+
+    # Backprop into hidden layer
+    delta1 = delta2.dot(W2.T) * (1 - a1**2)  # (4x2)
+    dW1 = X.T.dot(delta1)                   # (2x4) x (4x2) -> (2x2)
+    db1 = np.sum(delta1, axis=0, keepdims=True)  # (1x2)
+
+    # Update weights and biases
+    W2 -= lr * dW2
+    b2 -= lr * db2
+    W1 -= lr * dW1
+    b1 -= lr * db1
+
+    # Optional: print loss occasionally to monitor
+    if epoch % 1000 == 0:
+        print(f"epoch {epoch}, loss {loss:.4f}")
+
+# Evaluate on training data
+_, _, _, a2 = forward(X)
+preds = (a2 > 0.5).astype(int)
+print("Predictions:")
+print(preds)
+print("Truth:")
+print(y)
