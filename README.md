@@ -1,0 +1,1 @@
+This project implements a simple feedforward neural network in pure NumPy to solve the classic XOR classification problem. It demonstrates the fundamentals of neural networks, including forward propagation, backpropagation, and gradient-based optimization without using any deep learning libraries.
